@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Number Universe</title>
+<meta name="description" content="Explore the meaning behind numbers, angel numbers and numerology, and play real sound frequencies in an immersive studio.">
+<meta name="theme-color" content="#04050a">
+<link rel="canonical" href="https://thenumberuniverse.com/">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Number Universe">
+<meta property="og:title" content="The Number Universe · Every number has a story">
+<meta property="og:description" content="Numerology, angel numbers and real sound frequencies in one immersive experience. Explore the meaning behind any number and hear it.">
+<meta property="og:url" content="https://thenumberuniverse.com/">
+<meta property="og:image" content="https://thenumberuniverse.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Number Universe · Every number has a story">
+<meta name="twitter:description" content="Numerology, angel numbers and real sound frequencies in one immersive experience.">
+<meta name="twitter:image" content="https://thenumberuniverse.com/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="wrap">
+  <nav class="nav" aria-label="Main">
+    <a class="logo" href="#home" aria-label="The Number Universe home">
+      <svg viewBox="0 0 32 32" fill="none"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9d2ff"/><stop offset="1" stop-color="#7fb8ff"/></linearGradient></defs><circle cx="16" cy="16" r="13" stroke="url(#lg)" stroke-width="1.2"/><ellipse cx="16" cy="16" rx="13" ry="5" stroke="url(#lg)" stroke-width=".8" opacity=".6"/><circle cx="16" cy="16" r="2.4" fill="#fff"/></svg>
+      <span>The Number <b>Universe</b></span>
+    </a>
+    <div class="navlinks" id="navlinks">
+      <a href="#explore" data-r="explore">Explore Numbers</a>
+      <a href="#angel" data-r="angel">Angel Numbers</a>
+      <a href="#numerology" data-r="numerology">Numerology</a>
+      <a href="#studio" data-r="studio">Frequency Studio</a>
+      <a href="#intention" data-r="intention">By Intention</a>
+      <a href="#universe" data-r="universe">My Universe</a>
+    </div>
+    <button class="navsearch" id="navsearch" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span></button>
+    <button class="burger" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 8h16M4 16h16"/></svg></button>
+  </nav>
+
+  <main id="app"></main>
+
+  <footer>
+    <div>
+      <div class="logo" style="margin-bottom:12px"><span>The Number <b>Universe</b></span></div>
+      Numerology and angel number meanings are spiritual and cultural traditions, not scientific findings. Acoustics panels describe the physical sound. Every page labels which lens a statement comes from.
+    </div>
+    <div>
+      Listen at a comfortable volume and stop if you feel any discomfort. Binaural beats need headphones and should never be used while driving. Press Esc to stop all sound.<br><br>
+      <a href="#privacy">Privacy</a> &nbsp;·&nbsp; <a href="#blueprint">Product blueprint</a>
+    </div>
+  </footer>
+</div>
+
+<div class="dock" role="region" aria-label="Now playing">
+  <span class="dot" id="dDot"></span>
+  <div class="st" id="dStatus">Silence</div>
+  <canvas id="dScope" aria-hidden="true"></canvas>
+  <div class="vol">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+    <input type="range" id="dVol" min="0" max="1" step="0.01" value="0.3" aria-label="Master volume">
+  </div>
+  <button class="btn sm" id="dStop">Stop all</button>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true"><div class="card"><button class="ib x" id="mClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg></button><div id="mBody"></div></div></div>
+<div class="modal" id="palette" role="dialog" aria-modal="true" style="align-items:flex-start;padding-top:12vh"><div style="width:100%;max-width:720px" id="palBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

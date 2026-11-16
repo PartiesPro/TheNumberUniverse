@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: the-number-universe
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    domains:
+      - thenumberuniverse.com
+      - www.thenumberuniverse.com
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
