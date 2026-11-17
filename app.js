@@ -786,7 +786,7 @@ function vIntention() {
 /* ---------- birth chart ---------- */
 const BIG = { sun: ['Sun', 'Core identity'], moon: ['Moon', 'Emotional world'], rising: ['Rising', 'How you first come across'] };
 const zs = i => ASTRO.SIGNS[i].s + '︎';
-function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117e'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
+function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117f'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
 function chartResult(c) { try { return c && c.date ? ASTRO.compute(c.date, c.unknown ? '' : (c.time || ''), c.place || null) : null; } catch (e) { return null; } }
 function bigCard(kind, r, c) {
   const [nm, sub] = BIG[kind];
@@ -854,6 +854,15 @@ function fullChartHTML(c) {
     ${asp ? `<div class="card" style="margin-top:14px"><div class="lbl">Aspects</div><p class="muted" style="font-size:13px;margin-top:6px">The angles planets make to each other, tightest first. Astrology reads trines and sextiles as flowing, squares and oppositions as tension that drives growth, and conjunctions as energies blending.</p><div class="bc-asps">${asp}</div></div>` : ''}`;
 }
 
+function chartSaved() {
+  const c = Store.s.chart; if (!c || !c.date) return '';
+  let F; try { F = ASTRO.full(c.date, c.unknown ? '' : (c.time || ''), c.place || null); } catch (e) { return ''; }
+  const p = birthParts(c.date), when = new Date(p.y, p.m - 1, p.d).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+  const t = c.time && !c.unknown ? (() => { const [h, mi] = c.time.split(':').map(Number); return new Date(2000, 0, 1, h, mi).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); })() : 'Time unknown';
+  const rows = (F.houses ? [{ g: 'AC', n: 'Ascendant', lon: F.houses.asc, ang: 1 }, { g: 'MC', n: 'Midheaven', lon: F.houses.mc, ang: 1 }] : []).concat(F.bodies).map(b => { const S = ASTRO.SIGNS[Math.floor(b.lon / 30)]; return `<div class="uv-pl"><span class="${b.ang ? 'bc-ang' : 'uv-plg'}">${b.ang ? b.g : g15(b.g)}</span><b>${b.n}</b><span class="mono">${g15(S.s)} ${ASTRO.deg(b.lon)} ${S.n}${b.retro ? ' R' : ''}</span><span class="mono muted">${b.house ? ordn(b.house) : ''}</span></div>`; }).join('');
+  return `<section class="sec card uv-chart"><div class="sechead" style="margin-bottom:10px"><div><div class="lbl">Your birth chart</div><p class="muted" style="font-size:13px;margin-top:6px">${esc(when)} · ${esc(t)}${c.place ? ' · ' + esc(c.place.n) : ''}</p></div><div class="actions"><a class="btn sm pri" href="#chart">Open full chart ${I.arrow}</a><a class="btn sm" href="#chart">Update birth details</a></div></div>
+    <div class="uv-chartgrid"><div class="uv-wheel">${chartWheel(F)}</div><div><div class="uv-pls">${rows}</div>${F.exact ? '' : '<p class="dnote">Add your birth time and birthplace to place your houses, Rising sign and Midheaven.</p>'}</div></div></section>`;
+}
 function chartMini() {
   const c = Store.s.chart, r = chartResult(c);
   if (!r) return `<div class="uv-big3 uv-big3-cta"><div><div class="lbl">Your Big Three</div><p class="muted" style="font-size:13px;margin-top:6px">Sun, Moon and Rising, calculated from your birth date. Always free.</p></div><a class="btn sm" href="#chart">Discover your birth chart ${I.arrow}</a></div>`;
@@ -911,9 +920,11 @@ function vChart() {
   const show = c => {
     const r = chartResult(c); if (!r) return;
     $('#bcRes').innerHTML = `<div class="bc-grid">${bigCard('sun', r.sun, c)}${bigCard('moon', r.moon, c)}${bigCard('rising', r.rising, c)}</div>
-      <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>
+      <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save my chart to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>
       <div class="sec" style="margin-top:56px">${fullChartHTML(c)}</div>`;
-    $('#bcSave').onclick = () => { Store.s.chart = c; if (!Store.s.profile.birth) Store.s.profile.birth = c.date; Store.save(); toast('Your Big Three is saved to My Universe'); };
+    const same = Store.s.chart && JSON.stringify(Store.s.chart) === JSON.stringify(c), sb = $('#bcSave');
+    if (same) sb.innerHTML = I.starF + ' Saved to My Universe';
+    sb.onclick = () => { Store.s.chart = JSON.parse(JSON.stringify(c)); if (!Store.s.profile.birth) Store.s.profile.birth = c.date; Store.save(); sb.innerHTML = I.starF + ' Saved to My Universe'; toast('Your full chart is saved to My Universe'); };
   };
   $('#bcGo').onclick = () => { const c = read(); if (!birthParts(c.date)) return toast('Enter your birth date'); if (place.value.trim() && !c.place) return toast('Choose your birthplace from the list'); show(c); $('#bcRes').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   if (Store.s.chart && Store.s.chart.date) show(Store.s.chart);
@@ -986,6 +997,7 @@ function vUniverse() {
       ${lifeCard}
       <div class="card uv-listen"><div class="lbl">Listening this week</div><div class="glow" style="font-size:72px;margin-top:12px">${Math.round(week)}</div><div class="h3" style="font-size:22px">minutes</div><div class="uv-foot"><span class="muted" style="font-size:13px">${S.sessions.length ? 'Last session: ' + esc(S.sessions[0].label) : 'Layer tones, binaural beats and ambience to start your first session.'}</span><div class="actions">${listenAction}</div></div></div>
     </section>
+    ${chartSaved().replace('class="sec card uv-chart"', 'class="sec card uv-chart" style="margin-top:14px"')}
     <section class="sec grid g2" style="margin-top:14px">${favCard}${journalCard}</section>
     <section class="sec grid g2">
       <div class="card"><div class="lbl">My frequencies</div>${S.myF.length ? S.myF.map((m, i) => `<div class="row"><div class="grow"><b>${esc(m.name)}</b><span>${fmtHz(m.f)} · ${m.w === 'sawtooth' ? 'saw' : m.w} · ${noteOf(m.f)}</span></div><button class="btn sm" data-myplay="${i}">${I.play}</button><a class="btn sm" href="#${fKey(m.f)}">Open</a><button class="ib" data-mydel="${i}" aria-label="Delete frequency">${I.trash}</button></div>`).join('') : '<div class="empty">Create one on the home page and save it here.</div>'}
