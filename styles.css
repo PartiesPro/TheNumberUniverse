@@ -32,7 +32,8 @@ body.inner #bg{opacity:.38}
 .navsearch svg{width:15px;height:15px}
 .burger{display:none;background:none;border:0;padding:6px;cursor:pointer;margin-left:auto}
 .burger svg{width:24px;height:24px}
-@media(max-width:1080px){.navlinks{display:none}.navlinks.open{display:flex;position:absolute;top:100%;left:0;right:0;flex-direction:column;background:rgba(6,7,14,.97);padding:14px 20px 20px;border-bottom:1px solid var(--line)}.navlinks.open a{font-size:16px;padding:12px 14px}.burger{display:block}.navsearch span{display:none}}
+@media(max-width:1320px){.nav{gap:16px}.navlinks a{padding:8px 9px;font-size:12.5px}.navsearch span{display:none}}
+@media(max-width:1140px){.navlinks{display:none}.navlinks.open{display:flex;position:absolute;top:100%;left:0;right:0;flex-direction:column;background:rgba(6,7,14,.97);padding:14px 20px 20px;border-bottom:1px solid var(--line)}.navlinks.open a{font-size:16px;padding:12px 14px}.burger{display:block}.navsearch span{display:none}}
 
 /* type */
 .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--violet)}
