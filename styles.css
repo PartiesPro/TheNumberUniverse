@@ -329,3 +329,24 @@ footer a{border-bottom:1px solid var(--line2)}
 .cline p{margin-top:8px;font-size:14.5px;color:#cfd3e0}
 .cline p a{border-bottom:1px solid var(--line2)}
 .cline+.cline{padding-top:14px;border-top:1px solid var(--line)}
+
+/* my universe */
+.uv-top{display:grid;grid-template-columns:1.75fr 1fr;gap:14px;align-items:stretch}
+@media(max-width:860px){.uv-top{grid-template-columns:1fr}}
+.uv-life{display:flex;flex-direction:column;justify-content:center}
+.uv-title{font-family:var(--serif);font-weight:400;font-size:32px;line-height:1.1}
+.uv-form{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:20px;max-width:560px}
+@media(max-width:520px){.uv-form{grid-template-columns:1fr}}
+.uv-pair{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+@media(max-width:640px){.uv-pair{grid-template-columns:1fr}}
+.uv-listen{display:flex;flex-direction:column}
+.uv-foot{margin-top:auto;padding-top:14px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.uv-link{font-size:13px;color:#b9adff;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.uv-link svg{width:14px;height:14px}
+.uv-link:hover{color:#fff}
+.uv-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:22px 0 6px}
+.uv-empty b{font-weight:500;font-size:14px;color:#cfd3e0}
+.uv-empty span{font-size:13px;color:var(--muted)}
+.uv-empty .btn{margin-top:12px}
+.uv-ic{width:28px;height:28px;color:#b9adff;margin-bottom:8px}
+.uv-ic svg{width:28px;height:28px}
