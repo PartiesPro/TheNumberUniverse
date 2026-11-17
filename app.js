@@ -786,7 +786,7 @@ function vIntention() {
 /* ---------- birth chart ---------- */
 const BIG = { sun: ['Sun', 'Core identity'], moon: ['Moon', 'Emotional world'], rising: ['Rising', 'How you first come across'] };
 const zs = i => ASTRO.SIGNS[i].s + '︎';
-function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
+function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117b'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
 function chartResult(c) { try { return c && c.date ? ASTRO.compute(c.date, c.unknown ? '' : (c.time || ''), c.place || null) : null; } catch (e) { return null; } }
 function bigCard(kind, r, c) {
   const [nm, sub] = BIG[kind];
