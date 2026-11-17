@@ -137,7 +137,7 @@ function ac() {
   if (E.ac.state === 'suspended') E.ac.resume();
   return E.ac;
 }
-function logSession(label, start) { const end = Date.now(); if (!start || end - start < 5000) return; Store.s.sessions.unshift({ label, start, end }); Store.s.sessions = Store.s.sessions.slice(0, 80); Store.save(); }
+function logSession(label, start, extra) { const end = Date.now(); if (!start || end - start < 5000) return; Store.s.sessions.unshift(Object.assign({ label, start, end }, extra || {})); Store.s.sessions = Store.s.sessions.slice(0, 80); Store.save(); }
 
 /* single tone player */
 const T = { node: null, f: 440, w: 'sine', v: .7, dur: 0, timer: 0, label: '', start: 0, src: null };
@@ -150,7 +150,7 @@ function toneStart(f, label, src) {
   if (T.dur) { T.timer = setTimeout(() => toneStop(), T.dur * 60000); T.ends = Date.now() + T.dur * 60000; } else T.ends = 0;
   onAudio();
 }
-function toneStop(silent) { clearTimeout(T.timer); if (!T.node) return; const { o, g } = T.node, t = E.ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, .06); o.stop(t + .5); T.node = null; logSession(T.label, T.start); if (!silent) onAudio(); }
+function toneStop(silent) { clearTimeout(T.timer); if (!T.node) return; const { o, g } = T.node, t = E.ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, .06); o.stop(t + .5); T.node = null; logSession(T.label, T.start, { tone: { f: T.f, w: T.w } }); if (!silent) onAudio(); }
 function toneSetFreq(f, label) { T.f = f; if (label) T.label = label; if (T.node) T.node.o.frequency.setTargetAtTime(f, E.ac.currentTime, .02); onAudio(true); }
 function saveMyFreq(f, name, w) { Store.s.myF.unshift({ id: Date.now(), name: (name || '').trim() || fmtHz(f), f: +(+f).toFixed(2), w: w || 'sine' }); Store.s.myF = Store.s.myF.slice(0, 60); Store.save(); toast('Saved to My frequencies'); }
 function toneUpdate() { if (!T.node) return; const t = E.ac.currentTime; T.node.o.type = T.w; T.node.g.gain.setTargetAtTime(T.v * LV[T.w], t, .05); }
@@ -221,7 +221,7 @@ function mixStop(silent) {
   if (!M.playing) return;
   const t = E.ac.currentTime; M.bus.gain.cancelScheduledValues(t); M.bus.gain.setTargetAtTime(0, t, .1);
   const ns = [...M.nodes.values()]; M.nodes.clear(); setTimeout(() => ns.forEach(n => n.kill()), 700);
-  M.playing = false; clearTimeout(M.tid); M.timerEnd = 0; logSession('Mix: ' + M.name, M.start); if (!silent) onAudio();
+  M.playing = false; clearTimeout(M.tid); M.timerEnd = 0; logSession('Mix: ' + M.name, M.start, { mix: { name: M.name, layers: M.layers.map(({ id, ...r }) => r) } }); if (!silent) onAudio();
 }
 function armTimer() { clearTimeout(M.tid); M.timerEnd = 0; if (M.playing && M.timerMin > 0) { M.timerEnd = Date.now() + M.timerMin * 60000; M.tid = setTimeout(() => { const t = E.ac.currentTime; M.bus.gain.setTargetAtTime(0, t, 1.2); setTimeout(() => mixStop(), 4000); }, M.timerMin * 60000); } }
 function loadMix(mix, autoplay) { const was = M.playing; mixStop(true); M.layers = mix.layers.map(newLayer); M.name = mix.name; if (autoplay || was) mixStart(); else onAudio(); }
@@ -388,7 +388,7 @@ function bindPlayers(root) {
     $('[data-dur]', p).onchange = e => { T.dur = +e.target.value; if (T.node) toneStart(T.f, T.label); };
   });
   $$('[data-favf]', root).forEach(b => b.onclick = () => { const f = b.dataset.favf; toggleFav('f', f); const on = isFav('f', f); b.classList.toggle('on', on); b.innerHTML = on ? I.starF : I.star; });
-  $$('[data-favn]', root).forEach(b => b.onclick = () => { const n = b.dataset.favn; toggleFav('n', n); const on = isFav('n', n); b.classList.toggle('on', on); b.innerHTML = (on ? I.starF : I.star) + (b.dataset.txt ? ' ' + (on ? 'Saved' : 'Save') : ''); });
+  $$('[data-favn]', root).forEach(b => b.onclick = () => { const n = b.dataset.favn; toggleFav('n', n); const on = isFav('n', n); b.classList.toggle('on', on); b.innerHTML = (on ? I.starF : I.star) + (b.dataset.txt ? (on ? ' Saved to My Universe' : ' Save to My Universe') : ''); });
   $$('[data-tostudio]', root).forEach(b => b.onclick = () => { M.layers.push(newLayer({ k: 'tone', f: +b.dataset.tostudio, w: T.w, v: .5, pan: 0 })); if (M.playing) buildLayer(M.layers[M.layers.length - 1]); toast('Added to your Studio mix'); });
   onAudio();
 }
@@ -459,7 +459,8 @@ function bindCreator(root) {
 }
 
 /* ---------- views ---------- */
-let current = 'home', pendingIntent = null;
+let current = 'home', pendingIntent = null, pendingJournal = null;
+function studioPresets() { return [{ name: 'Solfeggio Chord', layers: [{ k: 'tone', f: 396, w: 'sine', v: .35, pan: -0.3 }, { k: 'tone', f: 528, w: 'sine', v: .3, pan: 0 }, { k: 'tone', f: 639, w: 'sine', v: .22, pan: 0.3 }] }, { name: '432 Calm', layers: [{ k: 'tone', f: 432, w: 'sine', v: .4, pan: 0 }, { k: 'tone', f: 216, w: 'sine', v: .3, pan: 0 }, { k: 'amb', type: 'ocean', v: .45 }] }, ...INTENT.map(i => i.mix)]; }
 function dailyPicks() { const di = dayIndex(); const ak = Object.keys(ANGEL); const fk = Object.keys(FREQ).map(Number).filter(f => f >= 100 && !FREQ[f].sym); return { n: ak[(di * 7) % ak.length], f: fk[(di * 5) % fk.length] }; }
 
 function vHome() {
@@ -527,7 +528,7 @@ function vNumber(str) {
         <div class="glow" style="margin-top:10px">${str}</div>
         <div class="title">${esc(title)}</div>
         <div class="meta">${lensTag('num', 'Numerology')}${angel ? lensTag('trad', 'Angel tradition') : ''}${cult ? lensTag('cult', 'Culture') : ''}${pf ? lensTag('ac', 'Acoustics') : ''}</div></div>
-      <div class="actions"><button class="btn" data-favn="${str}" data-txt="1">${isFav('n', str) ? I.starF + ' Saved' : I.star + ' Save'}</button>${pf ? `<a class="btn pri" data-scroll="sound">${I.play} Hear ${str} Hz</a>` : ''}<button class="btn" data-journal="${str}">Log a sighting</button></div>
+      <div class="actions"><button class="btn" data-favn="${str}" data-txt="1">${isFav('n', str) ? I.starF + ' Saved to My Universe' : I.star + ' Save to My Universe'}</button><button class="btn" data-journal="${str}">I saw this number</button>${pf ? `<a class="btn pri" data-scroll="sound">${I.play} Hear ${str} Hz</a>` : ''}</div>
     </header>
 
     <section class="sec cols">
@@ -571,7 +572,7 @@ function vNumber(str) {
   </div>`;
   bindPlayers(app);
   $$('[data-num]').forEach(d => d.onclick = () => numCardModal(+d.dataset.num));
-  $$('[data-journal]').forEach(b => b.onclick = () => { Store.s.journal.unshift({ d: new Date().toISOString(), n: b.dataset.journal, note: '' }); Store.save(); toast('Logged in your journal'); });
+  $$('[data-journal]').forEach(b => b.onclick = () => { pendingJournal = b.dataset.journal; location.hash = 'universe'; });
 }
 
 function vFreq(f) {
@@ -699,7 +700,7 @@ function layerHTML(L) {
   return `<div class="layer${L.mute ? ' muted' : ''}" data-l="${L.id}"><div class="lhead"><span class="ty">${ty}</span><span class="nm">${esc(nm)}</span><button class="ib${L.mute ? ' on' : ''}" data-act="mute" aria-label="Mute layer">${L.mute ? I.mute : I.spk}</button><button class="ib" data-act="del" aria-label="Remove layer">${I.trash}</button></div>${body}</div>`;
 }
 function vStudio() {
-  const presets = [{ name: 'Solfeggio Chord', layers: [{ k: 'tone', f: 396, w: 'sine', v: .35, pan: -0.3 }, { k: 'tone', f: 528, w: 'sine', v: .3, pan: 0 }, { k: 'tone', f: 639, w: 'sine', v: .22, pan: 0.3 }] }, { name: '432 Calm', layers: [{ k: 'tone', f: 432, w: 'sine', v: .4, pan: 0 }, { k: 'tone', f: 216, w: 'sine', v: .3, pan: 0 }, { k: 'amb', type: 'ocean', v: .45 }] }, ...INTENT.map(i => i.mix)];
+  const presets = studioPresets();
   app.innerHTML = `<div class="page fade">
     <div class="sechead"><div><div class="kicker">Frequency studio</div><h1 class="h2" style="margin-top:14px">Compose your <em>sound</em></h1></div><p class="lead" style="max-width:460px">Layer pure tones, binaural beats and generated ambience. Everything is synthesized live in your browser with the Web Audio API.</p></div>
     <div class="chips" style="margin:6px 0 26px">${presets.map((p, i) => `<button class="chip" data-pre="${i}">${esc(p.name)}</button>`).join('')}</div>
@@ -780,6 +781,25 @@ function vIntention() {
   if (sel !== INTENT[0].id) setTimeout(() => $('#itDetail').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
 }
 
+function starPos(list) {
+  const pts = [];
+  list.forEach(n => {
+    let h = 7; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0) * 17) % 100003;
+    let x = 8 + (h % 84), y = 16 + (Math.floor(h / 89) % 66), tries = 0;
+    while (pts.some(p => Math.hypot((p.x - x) * 1.6, p.y - y) < 30) && tries < 60) { x = 8 + ((x - 8 + 29) % 84); y = 16 + ((y - 16 + 23) % 66); tries++; }
+    pts.push({ n, x, y });
+  });
+  return pts;
+}
+const timesWord = c => ['', 'once', 'twice', 'three times', 'four times', 'five times', 'six times', 'seven times', 'eight times', 'nine times', 'ten times'][c] || c + ' times';
+function dayLabel(d) { const t = new Date(); t.setHours(0, 0, 0, 0); const x = new Date(d); x.setHours(0, 0, 0, 0); const diff = Math.round((t - x) / 864e5); return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : new Date(d).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); }
+function lastListen() {
+  const s = Store.s.sessions[0]; if (!s) return null;
+  if (s.mix) return { kind: 'mix', name: s.mix.name, mix: s.mix, label: s.label };
+  if (s.tone) return { kind: 'tone', f: s.tone.f, w: s.tone.w, label: s.label };
+  if (s.label.startsWith('Mix: ')) { const name = s.label.slice(5); const m = Store.s.mixes.find(x => x.name === name) || studioPresets().find(x => x.name === name); if (m) return { kind: 'mix', name, mix: m, label: s.label }; }
+  return { kind: 'none', label: s.label };
+}
 function vUniverse() {
   const S = Store.s, prof = S.profile, lp = lifePath(prof.birth), per = personal(prof.birth);
   const week = S.sessions.filter(s => s.end > Date.now() - 7 * 864e5).reduce((a, s) => a + (s.end - s.start), 0) / 60000;
@@ -793,20 +813,40 @@ function vUniverse() {
       </div><div class="actions" style="margin-top:18px"><a class="btn sm pri" href="#numerology">See your free full report ${I.arrow}</a><button class="btn sm" id="uChange">Change birth date</button></div></div>`
     : `<div class="card uv-life"><h2 class="uv-title">Discover your Life Path</h2><p class="muted" style="font-size:14px;margin-top:6px">Enter your birth date to see your Life Path and Personal Year.</p>
         <div class="uv-form"><input class="input" type="date" id="uBirth" value="${esc(prof.birth || '')}" aria-label="Birth date"><button class="btn pri" id="uCalc">Calculate my numbers</button></div></div>`;
-  const favCard = S.favN.length
-    ? `<div class="card"><div class="lbl">Favorite numbers</div><div class="chips" style="margin-top:14px">${S.favN.map(n => `<a class="chip" href="#n-${n}"><b>${n}</b>${ANGEL[n] ? ' ' + esc(ANGEL[n][0]) : ''}</a>`).join('')}</div><a class="btn sm" href="#explore" style="margin-top:18px">Explore numbers</a></div>`
-    : `<div class="card"><div class="lbl">Favorite numbers</div><div class="uv-empty"><span class="uv-ic">${icSpark}</span><b>No favorite numbers yet.</b><span>Save numbers that feel meaningful to you.</span><a class="btn sm" href="#explore">Explore numbers</a></div></div>`;
-  const jForm = `<div class="grid uv-jform" id="jForm" style="grid-template-columns:120px 1fr auto;gap:10px;margin-top:14px${S.journal.length ? '' : ';display:none'}"><input class="input" id="jN" placeholder="1111" inputmode="numeric" aria-label="Number seen"><input class="input" id="jNote" placeholder="Where you saw it, how you felt" aria-label="Note"><button class="btn pri" id="jAdd">Log</button></div>`;
-  const journalCard = S.journal.length
-    ? `<div class="card"><div class="lbl">Number journal</div>${jForm}
-        ${top.length ? `<div class="chips" style="margin-top:14px">${top.map(([n, c]) => `<a class="chip" href="#n-${n}">Seen often <b>${n}</b> ×${c}</a>`).join('')}</div>` : ''}
-        <div style="margin-top:10px;max-height:300px;overflow:auto">${S.journal.slice(0, 40).map((j, i) => `<div class="row"><a href="#n-${j.n}" class="glow" style="font-size:34px;min-width:72px">${j.n}</a><div class="grow"><b>${new Date(j.d).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</b><span>${esc(j.note || 'No note')}</span></div><button class="ib" data-dj="${i}" aria-label="Delete entry">${I.trash}</button></div>`).join('')}</div></div>`
-    : `<div class="card"><div class="lbl">Number journal</div><div class="uv-empty" id="jEmpty"><span class="uv-ic">${icBook}</span><b>No journal entries yet.</b><span>Log a number and a note to start your journal.</span><button class="btn sm" id="jOpen">Log a number</button></div>${jForm}</div>`;
+  const favCard = (() => {
+    if (!S.favN.length) return `<div class="card"><div class="lbl">Favorite numbers</div><div class="uv-empty"><span class="uv-ic">${icSpark}</span><b>No favorite numbers yet.</b><span>Save numbers that feel meaningful to you.</span><a class="btn sm" href="#explore">Explore numbers</a></div></div>`;
+    const pts = starPos(S.favN.slice().reverse());
+    const lines = pts.slice(1).map((p, i) => `<line x1="${pts[i].x}" y1="${pts[i].y}" x2="${p.x}" y2="${p.y}"/>`).join('');
+    const tip = n => ANGEL[n] ? ANGEL[n][0] : NUM[n] ? NUM[n].t : NUM[analyze(n).root].t;
+    return `<div class="card"><div class="lbl">Your constellation</div>
+      <div class="uv-sky" role="list" aria-label="Your saved numbers as a constellation"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>
+        ${pts.map((p, i) => `<a class="uv-star" role="listitem" href="#n-${p.n}" style="left:${p.x}%;top:${p.y}%;animation-delay:${(i * .37) % 3}s" title="${esc(p.n + ' · ' + tip(p.n))}"><i></i><span>${p.n}</span></a>`).join('')}</div>
+      <div class="lbl" style="margin-top:16px">Saved numbers</div>
+      <div class="uv-list">${S.favN.map(n => `<a class="row" href="#n-${n}"><span class="glow" style="font-size:28px;min-width:64px">${n}</span><span class="grow"><b>${esc(tip(n))}</b><span>${ANGEL[n] ? 'Angel number' : NUM[n] ? 'Core number' : 'Root ' + analyze(n).root}</span></span>${I.arrow}</a>`).join('')}</div>
+      <a class="btn sm" href="#explore" style="margin-top:14px">Explore numbers</a></div>`;
+  })();
+  const jForm = `<div class="uv-jform" id="jForm"${S.journal.length || pendingJournal ? '' : ' style="display:none"'}>
+      <div class="field uv-jn"><label for="jN">Number you saw</label><input class="input" id="jN" placeholder="444" inputmode="numeric" value="${esc(pendingJournal || '')}"></div>
+      <div class="field"><label for="jNote">What was happening when you noticed it? <span class="uv-opt">Optional</span></label><input class="input" id="jNote" placeholder="A moment, a place, a feeling" maxlength="200"></div>
+      <button class="btn pri" id="jAdd">Log</button></div>`;
+  const now = new Date(), monthCounts = {};
+  S.journal.forEach(j => { const d = new Date(j.d); if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) monthCounts[j.n] = (monthCounts[j.n] || 0) + 1; });
+  const topM = Object.entries(monthCounts).sort((x, y) => y[1] - x[1])[0];
+  const insight = topM && topM[1] > 1 ? `You've logged <a href="#n-${topM[0]}">${topM[0]}</a> ${timesWord(topM[1])} this month.` : S.journal.length ? `Your latest sighting was <a href="#n-${S.journal[0].n}">${S.journal[0].n}</a>. Log it again when it returns and patterns will appear here.` : '';
+  const groups = []; S.journal.slice(0, 60).forEach((j, i) => { const k = dayLabel(j.d); let g = groups[groups.length - 1]; if (!g || g.k !== k) groups.push(g = { k, items: [] }); g.items.push({ j, i }); });
+  const journalCard = S.journal.length || pendingJournal
+    ? `<div class="card" id="jCard"><div class="lbl">Number journal</div>${insight ? `<p class="uv-insight">${insight}</p>` : ''}${jForm}
+        ${groups.length ? `<div class="uv-tl">${groups.map(g => `<div class="uv-day">${g.k}</div>${g.items.map(({ j, i }) => `<div class="uv-ent"><a href="#n-${j.n}" class="glow">${j.n}</a><div class="grow"><b>${new Date(j.d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</b><span>${j.note ? esc(j.note) : 'No note'}</span></div><button class="ib" data-dj="${i}" aria-label="Delete entry">${I.trash}</button></div>`).join('')}`).join('')}</div>` : ''}</div>`
+    : `<div class="card" id="jCard"><div class="lbl">Number journal</div><div class="uv-empty" id="jEmpty"><span class="uv-ic">${icBook}</span><b>No journal entries yet.</b><span>Log a number and a note to start your journal.</span><button class="btn sm" id="jOpen">Log a number</button></div>${jForm}</div>`;
+  const ll = lastListen();
+  const listenAction = !ll ? `<a class="btn sm pri" href="#studio">Try Frequency Studio ${I.arrow}</a>`
+    : ll.kind === 'none' ? `<a class="uv-link" href="#studio">Open Studio ${I.arrow}</a>`
+    : `<button class="btn sm pri" id="uAgain">${I.play} Listen again</button><a class="uv-link" href="#studio">Open Studio ${I.arrow}</a>`;
   app.innerHTML = `<div class="page fade">
     <div class="sechead"><div><div class="kicker">My universe</div><h1 class="h2" style="margin-top:14px">Your private <em>constellation</em></h1><p class="muted" style="margin-top:12px;font-size:15px">Discover your numbers and revisit what you save.</p></div><span class="sync${Cloud.on ? ' on' : ''}"><i></i><span>${Cloud.on ? 'Synced privately to your account' : 'Saved on this device only'}</span></span></div>
     <section class="sec uv-top" style="margin-top:30px">
       ${lifeCard}
-      <div class="card uv-listen"><div class="lbl">Listening this week</div><div class="glow" style="font-size:72px;margin-top:12px">${Math.round(week)}</div><div class="h3" style="font-size:22px">minutes</div><div class="uv-foot"><span class="muted" style="font-size:13px">${S.sessions.length ? 'Last session: ' + esc(S.sessions[0].label) : 'Sessions longer than five seconds appear here.'}</span><a class="uv-link" href="#studio">Open Studio ${I.arrow}</a></div></div>
+      <div class="card uv-listen"><div class="lbl">Listening this week</div><div class="glow" style="font-size:72px;margin-top:12px">${Math.round(week)}</div><div class="h3" style="font-size:22px">minutes</div><div class="uv-foot"><span class="muted" style="font-size:13px">${S.sessions.length ? 'Last session: ' + esc(S.sessions[0].label) : 'Layer tones, binaural beats and ambience to start your first session.'}</span><div class="actions">${listenAction}</div></div></div>
     </section>
     <section class="sec grid g2" style="margin-top:14px">${favCard}${journalCard}</section>
     <section class="sec grid g2">
@@ -827,7 +867,11 @@ function vUniverse() {
   const chg = $('#uChange');
   if (chg) chg.onclick = () => { const card = $('.uv-life'); card.innerHTML = `<h2 class="uv-title">Discover your Life Path</h2><p class="muted" style="font-size:14px;margin-top:6px">Enter your birth date to see your Life Path and Personal Year.</p><div class="uv-form"><input class="input" type="date" id="uBirth" value="${esc(prof.birth || '')}" aria-label="Birth date"><button class="btn pri" id="uCalc">Calculate my numbers</button></div>`; $('#uCalc').onclick = () => { const b = $('#uBirth').value; if (!birthParts(b)) return toast('Enter your birth date'); Store.s.profile = { ...Store.s.profile, birth: b }; Store.save(); vUniverse(); }; $('#uBirth').focus(); };
   const jo = $('#jOpen'); if (jo) jo.onclick = () => { $('#jEmpty').style.display = 'none'; $('#jForm').style.display = ''; $('#jN').focus(); };
-  const add = () => { const n = $('#jN').value.replace(/\D/g, ''); if (!n) return toast('Enter the number you saw'); Store.s.journal.unshift({ d: new Date().toISOString(), n, note: $('#jNote').value.trim() }); Store.save(); vUniverse(); };
+  if (pendingJournal) { pendingJournal = null; setTimeout(() => { const c = $('#jCard'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); $('#jNote').focus({ preventScroll: true }); }, 120); }
+  const ag = $('#uAgain');
+  if (ag) { const sync = () => { const on = ll.kind === 'mix' ? M.playing && M.name === ll.name : !!T.node && T.f === ll.f; ag.innerHTML = on ? I.stop + ' Stop' : I.play + ' Listen again'; };
+    ag.onclick = () => { if (ll.kind === 'mix') { if (M.playing && M.name === ll.name) mixStop(); else loadMix(ll.mix, true); } else { if (T.node && T.f === ll.f) toneStop(); else { T.w = ll.w || 'sine'; toneStart(ll.f, ll.label, 'mine'); } } sync(); }; sync(); }
+  const add = () => { const n = $('#jN').value.replace(/\D/g, '').slice(0, 15); if (!n) return toast('Enter the number you saw'); Store.s.journal.unshift({ d: new Date().toISOString(), n, note: $('#jNote').value.trim() }); Store.save(); toast('Logged in your journal'); vUniverse(); };
   $('#jAdd').onclick = add; $('#jNote').onkeydown = e => { if (e.key === 'Enter') add(); }; $('#jN').onkeydown = e => { if (e.key === 'Enter') add(); };
   $$('[data-dj]').forEach(b => b.onclick = () => { Store.s.journal.splice(+b.dataset.dj, 1); Store.save(); vUniverse(); });
   $$('[data-myplay]').forEach(b => b.onclick = () => { const m = Store.s.myF[+b.dataset.myplay]; if (T.node && T.src === 'mine' && T.f === m.f) { toneStop(); return; } T.w = m.w; toneStart(m.f, m.name + ' · ' + fmtHz(m.f), 'mine'); });
