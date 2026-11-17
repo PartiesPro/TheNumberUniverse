@@ -786,7 +786,7 @@ function vIntention() {
 /* ---------- birth chart ---------- */
 const BIG = { sun: ['Sun', 'Core identity'], moon: ['Moon', 'Emotional world'], rising: ['Rising', 'How you first come across'] };
 const zs = i => ASTRO.SIGNS[i].s + '︎';
-function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117f'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
+function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117g'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
 function chartResult(c) { try { return c && c.date ? ASTRO.compute(c.date, c.unknown ? '' : (c.time || ''), c.place || null) : null; } catch (e) { return null; } }
 function bigCard(kind, r, c) {
   const [nm, sub] = BIG[kind];
@@ -801,6 +801,55 @@ function bigCard(kind, r, c) {
   }
   const S = ASTRO.SIGNS[r.i[0]];
   return `<div class="bc-card">${head}<div class="bc-sym">${zs(r.i[0])}</div><div class="bc-name">${S.n}${r.lon !== undefined && c.place && c.time && !c.unknown ? `<span class="bc-deg mono">${ASTRO.deg(r.lon)}</span>` : ''}</div><p>${S[kind === 'rising' ? 'rise' : kind]}</p><div class="chips" style="margin-top:14px"><span class="chip" style="cursor:default">${S.el}</span><span class="chip" style="cursor:default">${S.mo}</span><span class="chip" style="cursor:default">Ruled by ${S.ru}</span></div></div>`;
+}
+
+
+const PY_THEME = { 1: 'new beginnings, fresh starts and planting seeds', 2: 'patience, partnership and quiet cooperation', 3: 'creativity, self expression and a fuller social life', 4: 'building solid foundations through steady work', 5: 'change, freedom and movement', 6: 'home, love and responsibility to the people close to you', 7: 'reflection, study and inner work', 8: 'ambition, money and achievement', 9: 'completion, release and clearing space for what comes next' };
+const EL_LINE = { Fire: 'energy, courage and enthusiasm come naturally to you', Earth: 'you are practical, patient and grounded in what is real', Air: 'you live through ideas, conversation and connection', Water: 'you feel deeply and read people and moods with ease' };
+const MO_LINE = { Cardinal: 'You like to be the one who starts things.', Fixed: 'Once you commit, you are steady and hard to move.', Mutable: 'You adapt easily and thrive on variety.' };
+function natalFor(c) { try { return ASTRO.full(c.date, c.unknown ? '' : (c.time || ''), c.place || null); } catch (e) { return null; } }
+function aboutYou(c, F) {
+  F = F || natalFor(c); if (!F) return '';
+  const B = k => F.bodies.find(b => b.k === k), S = i => ASTRO.SIGNS[i];
+  const sun = B('sun').sign, moon = B('moon').sign, asc = F.houses ? Math.floor(F.houses.asc / 30) : null;
+  const w = { Fire: 0, Earth: 0, Air: 0, Water: 0 }, mw = { Cardinal: 0, Fixed: 0, Mutable: 0 };
+  F.bodies.forEach(b => { const x = b.k === 'sun' || b.k === 'moon' ? 2 : 1; w[S(b.sign).el] += x; mw[S(b.sign).mo] += x; });
+  if (asc !== null) { w[S(asc).el] += 2; mw[S(asc).mo] += 2; }
+  const el = Object.entries(w).sort((x, y) => y[1] - x[1])[0][0], mo = Object.entries(mw).sort((x, y) => y[1] - x[1])[0][0];
+  const lp = lifePath(c.date);
+  const rise = asc !== null ? ` With ${S(asc).n} Rising, ${S(asc).rise.charAt(0).toLowerCase() + S(asc).rise.slice(1)}` : '';
+  return `With your Sun in ${S(sun).n}, you are ${ASTRO.STYLE[sun]} at heart. Your Moon in ${S(moon).n}${F.moonApprox ? ' (likely, without a birth time)' : ''} means you feel things in ${/^[aeiou]/.test(ASTRO.STYLE[moon]) ? 'an' : 'a'} ${ASTRO.STYLE[moon]} way.${rise} Your chart leans toward ${el}, so ${EL_LINE[el]}. ${MO_LINE[mo]}${lp ? ` In numerology, your Life Path ${lp.n}, ${NUM[lp.n].t}, adds a thread of ${NUM[lp.n].k.toLowerCase()}.` : ''}`;
+}
+function skyYear(k, year) {
+  const seg = []; let last = -1;
+  for (let d = 0; d <= 365; d += 2) { const ms = Date.UTC(year, 0, 1) + d * 864e5, s = Math.floor(ASTRO.planetLon(k, ASTRO.jd(ms)) / 30); if (s !== last) { seg.push({ s, from: ms, days: 0 }); last = s; } seg[seg.length - 1].days += 2; }
+  return seg;
+}
+function yearAhead(c, F, year) {
+  F = F || natalFor(c); if (!F) return '';
+  const base = F.houses ? Math.floor(F.houses.asc / 30) : F.bodies.find(b => b.k === 'sun').sign;
+  const hOf = s => ((s - base + 12) % 12) + 1, S = i => ASTRO.SIGNS[i], mon = ms => new Date(ms).toLocaleDateString([], { month: 'long', timeZone: 'UTC' });
+  const per = personal(c.date, new Date(year, 6, 1)), py = per ? per.py : null;
+  const J = skyYear('jupiter', year), Sa = skyYear('saturn', year);
+  const nJ = F.bodies.find(b => b.k === 'jupiter').sign, nS = F.bodies.find(b => b.k === 'saturn').sign;
+  let out = py ? `${year} is a Personal Year ${py} for you, a year of ${PY_THEME[py]}. ` : '';
+  if (J.length === 1) out += `Jupiter spends the year in ${S(J[0].s).n}, your ${ordn(hOf(J[0].s))} house, so growth and good fortune tend to arrive through ${ASTRO.HOUSES[hOf(J[0].s) - 1]}. `;
+  else { const a = J[0], b = J[J.length - 1]; out += `Jupiter moves from ${S(a.s).n} into ${S(b.s).n} around ${mon(b.from)}, shifting your growth from ${ASTRO.HOUSES[hOf(a.s) - 1]} toward ${ASTRO.HOUSES[hOf(b.s) - 1]}. `; }
+  const main = Sa.slice().sort((x, y) => y.days - x.days)[0];
+  const multi = new Set(Sa.map(x => x.s)).size > 1;
+  out += multi ? `Saturn settles into ${S(main.s).n} after leaving ${S(Sa.find(x => x.s !== main.s).s).n}, asking for patience and steady effort around ${ASTRO.HOUSES[hOf(main.s) - 1]}.` : `Saturn in ${S(main.s).n} asks for patience and steady effort around ${ASTRO.HOUSES[hOf(main.s) - 1]}.`;
+  if (J.some(x => x.s === nJ)) out += ` Jupiter also returns to its place in your birth chart, a twelve year high point for opportunity and optimism.`;
+  const satRet = yy => skyYear('saturn', yy).some(x => x.days > 60 && x.s === nS);
+  if (satRet(year)) out += satRet(year - 1) ? ` Your Saturn return continues, so keep building the foundations of your next chapter.` : ` This is also your Saturn return, a once in about 29 years reset that asks you to step fully into your next chapter.`;
+  return out;
+}
+function insightsHTML(c, F, compact) {
+  F = F || natalFor(c); if (!F) return '';
+  const y0 = new Date().getFullYear(), basis = F.houses ? 'Houses are counted from your Rising sign.' : 'Houses are counted from your Sun sign, since your birth time and place are not known.';
+  return `<div class="bc-ins${compact ? ' compact' : ''}">
+    <div class="card bc-about"><div class="lbl">About you</div><p>${aboutYou(c, F)}</p></div>
+    <div class="bc-years">${[y0, y0 + 1].map(y => `<div class="card bc-year"><div class="bc-yh"><span class="glow">${y}</span>${(() => { const p = personal(c.date, new Date(y, 6, 1)); return p ? `<span class="lbl">Personal Year ${p.py}</span>` : ''; })()}</div><p>${yearAhead(c, F, y)}</p></div>`).join('')}</div>
+    <p class="dnote" style="margin-top:12px">${lensTag('trad', 'Astrology and numerology tradition')} Based on where Jupiter and Saturn actually travel in these years and your Personal Year number. ${basis} Offered for reflection, not prediction.</p></div>`;
 }
 
 const ordn = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
@@ -861,7 +910,8 @@ function chartSaved() {
   const t = c.time && !c.unknown ? (() => { const [h, mi] = c.time.split(':').map(Number); return new Date(2000, 0, 1, h, mi).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); })() : 'Time unknown';
   const rows = (F.houses ? [{ g: 'AC', n: 'Ascendant', lon: F.houses.asc, ang: 1 }, { g: 'MC', n: 'Midheaven', lon: F.houses.mc, ang: 1 }] : []).concat(F.bodies).map(b => { const S = ASTRO.SIGNS[Math.floor(b.lon / 30)]; return `<div class="uv-pl"><span class="${b.ang ? 'bc-ang' : 'uv-plg'}">${b.ang ? b.g : g15(b.g)}</span><b>${b.n}</b><span class="mono">${g15(S.s)} ${ASTRO.deg(b.lon)} ${S.n}${b.retro ? ' R' : ''}</span><span class="mono muted">${b.house ? ordn(b.house) : ''}</span></div>`; }).join('');
   return `<section class="sec card uv-chart"><div class="sechead" style="margin-bottom:10px"><div><div class="lbl">Your birth chart</div><p class="muted" style="font-size:13px;margin-top:6px">${esc(when)} · ${esc(t)}${c.place ? ' · ' + esc(c.place.n) : ''}</p></div><div class="actions"><a class="btn sm pri" href="#chart">Open full chart ${I.arrow}</a><a class="btn sm" href="#chart">Update birth details</a></div></div>
-    <div class="uv-chartgrid"><div class="uv-wheel">${chartWheel(F)}</div><div><div class="uv-pls">${rows}</div>${F.exact ? '' : '<p class="dnote">Add your birth time and birthplace to place your houses, Rising sign and Midheaven.</p>'}</div></div></section>`;
+    <div class="uv-chartgrid"><div class="uv-wheel">${chartWheel(F)}</div><div><div class="uv-pls">${rows}</div>${F.exact ? '' : '<p class="dnote">Add your birth time and birthplace to place your houses, Rising sign and Midheaven.</p>'}</div></div>
+    <div style="margin-top:22px">${insightsHTML(c, F, true)}</div></section>`;
 }
 function chartMini() {
   const c = Store.s.chart, r = chartResult(c);
@@ -921,6 +971,7 @@ function vChart() {
     const r = chartResult(c); if (!r) return;
     $('#bcRes').innerHTML = `<div class="bc-grid">${bigCard('sun', r.sun, c)}${bigCard('moon', r.moon, c)}${bigCard('rising', r.rising, c)}</div>
       <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save my chart to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>
+      <div class="sec" style="margin-top:56px"><div class="kicker">Your story in the stars</div><h2 class="h2" style="margin-top:12px;margin-bottom:20px">You, and the <em>years ahead</em></h2>${insightsHTML(c)}</div>
       <div class="sec" style="margin-top:56px">${fullChartHTML(c)}</div>`;
     const same = Store.s.chart && JSON.stringify(Store.s.chart) === JSON.stringify(c), sb = $('#bcSave');
     if (same) sb.innerHTML = I.starF + ' Saved to My Universe';

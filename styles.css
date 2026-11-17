@@ -456,3 +456,15 @@ footer a{border-bottom:1px solid var(--line2)}
 .uv-pl .muted{text-align:right}
 .uv-plg{font-size:19px;text-align:center;color:#e6e2ff;font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols",serif;text-shadow:0 0 10px rgba(165,147,255,.6)}
 .uv-pl .bc-ang{font-size:10.5px;padding:0;text-align:center}
+
+.bc-ins{display:grid;gap:14px}
+.bc-about p{font-family:var(--serif);font-size:23px;line-height:1.45;color:#e6e2ff;margin-top:12px;max-width:980px}
+.bc-years{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.bc-years{grid-template-columns:1fr}}
+.bc-yh{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.bc-yh .glow{font-size:56px}
+.bc-year p{margin-top:10px;font-size:15px;color:#cfd3e0;line-height:1.65}
+.bc-ins .dnote{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bc-ins.compact .card{background:rgba(255,255,255,.02);backdrop-filter:none;-webkit-backdrop-filter:none}
+.bc-ins.compact .bc-about p{font-size:19px}
+.bc-ins.compact .bc-yh .glow{font-size:40px}
