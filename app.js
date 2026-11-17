@@ -831,7 +831,7 @@ function vChart() {
       <p class="dnote">Only your birth date is required. Your details stay private to you.</p>
     </section>
     <section class="sec" id="bcRes" style="margin-top:22px"></section>
-    <section class="sec card tight"><p class="muted" style="font-size:13px">Sign positions are calculated in your browser with standard astronomical formulas, accurate to well under one degree, using the tropical zodiac followed in Western astrology. The meanings come from astrological tradition. They are interpretation for reflection, not science or prediction.</p></section>
+    <section class="sec card tight"><p class="muted" style="font-size:13px">Sign positions are calculated in your browser with standard astronomical formulas, accurate to well under one degree, using the tropical zodiac followed in Western astrology. The meanings come from astrological tradition. They are interpretation for reflection, not science or prediction. Birthplace data from <a href="https://www.geonames.org" style="border-bottom:1px solid var(--line2)">GeoNames</a>, CC BY 4.0.</p></section>
   </div>`;
   const place = $('#bcPlace'), sg = $('#bcSugg'); let list = [], act = 0;
   const pick = row => { D.place = { n: row[0], lat: row[1], lon: row[2], tz: row[3] }; place.value = row[0]; sg.classList.remove('open'); };
