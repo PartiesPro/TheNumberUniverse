@@ -125,5 +125,93 @@ window.ASTRO = (function () {
     return out;
   }
 
-  return { SIGNS, compute, deg, sunLon, moonLon, ascendant, localToUTC, jd };
+
+  /* Planets: JPL approximate Keplerian elements (valid 1800 to 2050), J2000 ecliptic, then precessed to date */
+  const EL = {
+    mercury: [0.38709927, 0.00000037, 0.20563593, 0.00001906, 7.00497902, -0.00594749, 252.25032350, 149472.67411175, 77.45779628, 0.16047689, 48.33076593, -0.12534081],
+    venus: [0.72333566, 0.00000390, 0.00677672, -0.00004107, 3.39467605, -0.00078890, 181.97909950, 58517.81538729, 131.60246718, 0.00268329, 76.67984255, -0.27769418],
+    earth: [1.00000261, 0.00000562, 0.01671123, -0.00004392, -0.00001531, -0.01294668, 100.46457166, 35999.37244981, 102.93768193, 0.32327364, 0, 0],
+    mars: [1.52371034, 0.00001847, 0.09339410, 0.00007882, 1.84969142, -0.00813131, -4.55343205, 19140.30268499, -23.94362959, 0.44441088, 49.55953891, -0.29257343],
+    jupiter: [5.20288700, -0.00011607, 0.04838624, -0.00013253, 1.30439695, -0.00183714, 34.39644051, 3034.74612775, 14.72847983, 0.21252668, 100.47390909, 0.20469106],
+    saturn: [9.53667594, -0.00125060, 0.05386179, -0.00050991, 2.48599187, 0.00193609, 49.95424423, 1222.49362201, 92.59887831, -0.41897216, 113.66242448, -0.28867794],
+    uranus: [19.18916464, -0.00196176, 0.04725744, -0.00004397, 0.77263783, -0.00242939, 313.23810451, 428.48202785, 170.95427630, 0.40805281, 74.01692503, 0.04240589],
+    neptune: [30.06992276, 0.00026291, 0.00859048, 0.00005105, 1.77004347, 0.00035372, -55.12002969, 218.45945325, 44.96476227, -0.32241464, 131.78422574, -0.00508664],
+    pluto: [39.48211675, -0.00031596, 0.24882730, 0.00005170, 17.14001206, 0.00004818, 238.92903833, 145.20780515, 224.06891629, -0.04062942, 110.30393684, -0.01183482]
+  };
+  function helio(k, T) {
+    const e0 = EL[k], a = e0[0] + e0[1] * T, e = e0[2] + e0[3] * T, I = (e0[4] + e0[5] * T) * R, L = e0[6] + e0[7] * T, wb = e0[8] + e0[9] * T, Om = e0[10] + e0[11] * T;
+    const w = (wb - Om) * R, O = Om * R; let M = norm(L - wb); if (M > 180) M -= 360; M *= R;
+    let E = M + e * Math.sin(M); for (let i = 0; i < 12; i++) E -= (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    const xp = a * (Math.cos(E) - e), yp = a * Math.sqrt(1 - e * e) * Math.sin(E);
+    const cw = Math.cos(w), sw = Math.sin(w), cO = Math.cos(O), sO = Math.sin(O), cI = Math.cos(I), sI = Math.sin(I);
+    return [(cw * cO - sw * sO * cI) * xp + (-sw * cO - cw * sO * cI) * yp, (cw * sO + sw * cO * cI) * xp + (-sw * sO + cw * cO * cI) * yp, (sw * sI) * xp + (cw * sI) * yp];
+  }
+  function planetLon(k, J) {
+    const T = cent(J), p = helio(k, T), ea = helio('earth', T);
+    return norm(Math.atan2(p[1] - ea[1], p[0] - ea[0]) / R + 1.396971 * T + .0003086 * T * T);
+  }
+  function mc(J, lon) {
+    const T = cent(J), gmst = norm(280.46061837 + 360.98564736629 * (J - 2451545) + .000387933 * T * T - T * T * T / 38710000);
+    const th = norm(gmst + lon) * R, eps = (23.4392911 - .0130042 * T) * R;
+    return { mc: norm(Math.atan2(Math.sin(th), Math.cos(th) * Math.cos(eps)) / R), ramc: th / R, eps };
+  }
+  /* Placidus houses, with Porphyry used near the poles where Placidus is undefined */
+  function houses(J, lat, lon) {
+    const { mc: M, ramc, eps } = mc(J, lon), A = ascendant(J, lat, lon), ph = lat * R;
+    const lamOfRA = r => norm(Math.atan2(Math.sin(r * R), Math.cos(r * R) * Math.cos(eps)) / R);
+    const cusp = (frac, below) => {
+      let r = ramc + (below ? 180 - 90 * frac : 90 * frac), ok = true;
+      for (let i = 0; i < 30; i++) {
+        const l = lamOfRA(r) * R, d = Math.asin(Math.sin(eps) * Math.sin(l)), x = Math.tan(ph) * Math.tan(d);
+        if (Math.abs(x) >= 1) { ok = false; break; }
+        const ad = Math.asin(x) / R;
+        const nr = below ? ramc + 180 - frac * (90 - ad) : ramc + frac * (90 + ad);
+        if (Math.abs(nr - r) < 1e-7) { r = nr; break; } r = nr;
+      }
+      return ok ? lamOfRA(r) : null;
+    };
+    let c11 = cusp(1 / 3, false), c12 = cusp(2 / 3, false), c2 = cusp(2 / 3, true), c3 = cusp(1 / 3, true), sys = 'Placidus';
+    if ([c11, c12, c2, c3].some(x => x === null)) {
+      sys = 'Porphyry'; const q1 = norm(A - M), q2 = norm(M + 180 - A);
+      c11 = norm(M + q1 / 3); c12 = norm(M + 2 * q1 / 3); c2 = norm(A + q2 / 3); c3 = norm(A + 2 * q2 / 3);
+    }
+    const cs = [A, c2, c3, norm(M + 180), norm(c11 + 180), norm(c12 + 180), norm(A + 180), norm(c2 + 180), norm(c3 + 180), M, c11, c12];
+    return { cusps: cs, asc: A, mc: M, sys };
+  }
+  const houseOf = (lonv, cs) => { for (let i = 0; i < 12; i++) { const a = cs[i], b = cs[(i + 1) % 12], span = norm(b - a); if (norm(lonv - a) < span) return i + 1; } return 1; };
+
+  const PLANETS = [
+    ['sun', 'Sun', '☉', 'your core identity'], ['moon', 'Moon', '☽', 'your emotional world'], ['mercury', 'Mercury', '☿', 'how you think and communicate'],
+    ['venus', 'Venus', '♀', 'how you love and what you value'], ['mars', 'Mars', '♂', 'how you act and go after what you want'], ['jupiter', 'Jupiter', '♃', 'where you grow and find luck'],
+    ['saturn', 'Saturn', '♄', 'where you build discipline and learn lessons'], ['uranus', 'Uranus', '♅', 'where you break from convention'], ['neptune', 'Neptune', '♆', 'where you dream and idealize'], ['pluto', 'Pluto', '♇', 'where you transform']
+  ];
+  const STYLE = ['bold and direct', 'steady and sensual', 'curious and quick', 'protective and intuitive', 'warm and expressive', 'precise and helpful', 'graceful and fair', 'intense and perceptive', 'adventurous and candid', 'disciplined and ambitious', 'inventive and independent', 'imaginative and compassionate'];
+  const HOUSES = ['self and first impressions', 'money and personal values', 'communication and your local world', 'home, family and roots', 'creativity, play and romance', 'work, health and daily routines', 'partnership and close relationships', 'intimacy, shared resources and change', 'travel, learning and beliefs', 'career and public life', 'friends, community and hopes', 'solitude, the unconscious and spirituality'];
+  const ASPECTS = [[0, 'Conjunction', '☌', 8, 'n'], [60, 'Sextile', '⚹', 4, 'h'], [90, 'Square', '□', 7, 'c'], [120, 'Trine', '△', 7, 'h'], [180, 'Opposition', '☍', 8, 'c']];
+
+  function lonAt(k, J) { return k === 'sun' ? sunLon(J) : k === 'moon' ? moonLon(J) : planetLon(k, J); }
+  /* full chart: exact when time and place are known, otherwise noon positions without houses */
+  function full(date, time, place) {
+    const [y, m, d] = date.split('-').map(Number);
+    let ms, exact = !!(time && place);
+    if (exact) { const [h, mi] = time.split(':').map(Number); ms = localToUTC(y, m, d, h, mi, place.tz); }
+    else if (place) ms = localToUTC(y, m, d, 12, 0, place.tz);
+    else if (time) { const [h, mi] = time.split(':').map(Number); ms = Date.UTC(y, m - 1, d, h, mi); }
+    else ms = Date.UTC(y, m - 1, d, 12, 0);
+    const J = jd(ms);
+    const H = exact ? houses(J, place.lat, place.lon) : null;
+    const bodies = PLANETS.map(([k, n, g, mean]) => {
+      const lonv = lonAt(k, J), retro = k !== 'sun' && k !== 'moon' && norm(lonAt(k, J + .5) - lonAt(k, J - .5) + 180) - 180 < 0;
+      return { k, n, g, mean, lon: lonv, sign: signOf(lonv), retro, house: H ? houseOf(lonv, H.cusps) : null };
+    });
+    const asp = [];
+    for (let i = 0; i < bodies.length; i++) for (let j = i + 1; j < bodies.length; j++) {
+      const sep = Math.abs(norm(bodies[i].lon - bodies[j].lon + 180) - 180);
+      for (const [ang, nm, gl, orb, kind] of ASPECTS) { const off = Math.abs(sep - ang); if (off <= orb) { asp.push({ a: bodies[i], b: bodies[j], nm, gl, kind, orb: off }); break; } }
+    }
+    asp.sort((p, q) => p.orb - q.orb);
+    return { exact, bodies, houses: H, aspects: asp, moonApprox: !exact };
+  }
+
+  return { SIGNS, compute, deg, sunLon, moonLon, ascendant, localToUTC, jd, planetLon, houses, full, PLANETS, STYLE, HOUSES, mc };
 })();

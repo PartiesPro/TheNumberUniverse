@@ -786,7 +786,7 @@ function vIntention() {
 /* ---------- birth chart ---------- */
 const BIG = { sun: ['Sun', 'Core identity'], moon: ['Moon', 'Emotional world'], rising: ['Rising', 'How you first come across'] };
 const zs = i => ASTRO.SIGNS[i].s + '︎';
-function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117d'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
+function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js?v=20261117e'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
 function chartResult(c) { try { return c && c.date ? ASTRO.compute(c.date, c.unknown ? '' : (c.time || ''), c.place || null) : null; } catch (e) { return null; } }
 function bigCard(kind, r, c) {
   const [nm, sub] = BIG[kind];
@@ -802,6 +802,58 @@ function bigCard(kind, r, c) {
   const S = ASTRO.SIGNS[r.i[0]];
   return `<div class="bc-card">${head}<div class="bc-sym">${zs(r.i[0])}</div><div class="bc-name">${S.n}${r.lon !== undefined && c.place && c.time && !c.unknown ? `<span class="bc-deg mono">${ASTRO.deg(r.lon)}</span>` : ''}</div><p>${S[kind === 'rising' ? 'rise' : kind]}</p><div class="chips" style="margin-top:14px"><span class="chip" style="cursor:default">${S.el}</span><span class="chip" style="cursor:default">${S.mo}</span><span class="chip" style="cursor:default">Ruled by ${S.ru}</span></div></div>`;
 }
+
+const ordn = n => n + (n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th');
+const g15 = s => s + '︎';
+function chartWheel(F) {
+  const C = 300, ref = F.houses ? F.houses.asc : 0;
+  const ang = l => (180 + (l - ref)) * Math.PI / 180, P = (l, r) => [C + r * Math.cos(ang(l)), C - r * Math.sin(ang(l))];
+  const f = n => n.toFixed(1);
+  const ELC = { Fire: '255,150,130', Earth: '190,205,150', Air: '150,195,255', Water: '175,155,255' };
+  let s = `<svg viewBox="0 0 600 600" class="bc-wheel" role="img" aria-label="Your birth chart wheel"><defs><radialGradient id="bcg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="rgba(120,105,255,.16)"/><stop offset="1" stop-color="rgba(10,12,24,0)"/></radialGradient></defs>`;
+  s += `<circle cx="300" cy="300" r="292" fill="url(#bcg)" stroke="rgba(207,211,224,.22)"/>`;
+  for (let i = 0; i < 12; i++) {
+    const a0 = i * 30, a1 = a0 + 30, [x0, y0] = P(a0, 292), [x1, y1] = P(a1, 292), [x2, y2] = P(a1, 248), [x3, y3] = P(a0, 248);
+    s += `<path d="M${f(x0)} ${f(y0)} A292 292 0 0 0 ${f(x1)} ${f(y1)} L${f(x2)} ${f(y2)} A248 248 0 0 1 ${f(x3)} ${f(y3)} Z" fill="rgba(${ELC[ASTRO.SIGNS[i].el]},.07)" stroke="rgba(207,211,224,.18)"/>`;
+    const [gx, gy] = P(a0 + 15, 270);
+    s += `<text x="${f(gx)}" y="${f(gy)}" class="bc-wz" text-anchor="middle" dominant-baseline="central">${g15(ASTRO.SIGNS[i].s)}</text>`;
+  }
+  for (let d = 0; d < 360; d += 5) { const [x0, y0] = P(d, 248), [x1, y1] = P(d, d % 10 ? 243 : 239); s += `<line x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}" stroke="rgba(207,211,224,.28)"/>`; }
+  s += `<circle cx="300" cy="300" r="248" fill="none" stroke="rgba(207,211,224,.22)"/><circle cx="300" cy="300" r="150" fill="rgba(6,7,16,.55)" stroke="rgba(207,211,224,.2)"/>`;
+  if (F.houses) {
+    const cs = F.houses.cusps;
+    cs.forEach((c, i) => {
+      const axis = i % 3 === 0, [x0, y0] = P(c, 150), [x1, y1] = P(c, axis ? 296 : 248);
+      s += `<line x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}" stroke="${axis ? 'rgba(217,189,127,.85)' : 'rgba(207,211,224,.25)'}" stroke-width="${axis ? 1.6 : 1}"/>`;
+      const nx = cs[(i + 1) % 12], mid = c + ((nx - c + 360) % 360) / 2, [hx, hy] = P(mid, 163);
+      s += `<text x="${f(hx)}" y="${f(hy)}" class="bc-wh" text-anchor="middle" dominant-baseline="central">${i + 1}</text>`;
+    });
+    [['AC', cs[0]], ['IC', cs[3]], ['DC', cs[6]], ['MC', cs[9]]].forEach(([t, l]) => { const [x, y] = P(l, 306); s += `<text x="${f(x)}" y="${f(y)}" class="bc-wa" text-anchor="middle" dominant-baseline="central">${t}</text>`; });
+  }
+  F.aspects.filter(x => x.kind !== 'n').forEach(x => { const [x0, y0] = P(x.a.lon, 148), [x1, y1] = P(x.b.lon, 148); s += `<line x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}" stroke="${x.kind === 'h' ? 'rgba(127,184,255,' : 'rgba(240,160,190,'}${(.75 - x.orb * .06).toFixed(2)})" stroke-width="1.1"/>`; });
+  const pts = F.bodies.map(b => ({ b, d: b.lon })).sort((p, q) => p.d - q.d);
+  for (let it = 0; it < 60; it++) { let moved = false; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; const gap = ((q.d - p.d) + 360) % 360; if (pts.length > 1 && gap < 9) { const push = (9 - gap) / 2; p.d -= push; q.d += push; moved = true; } } if (!moved) break; }
+  pts.forEach(({ b, d }) => {
+    const [tx, ty] = P(b.lon, 248), [tx2, ty2] = P(b.lon, 238), [lx, ly] = P(d, 226), [gx, gy] = P(d, 212), [dx, dy] = P(d, 190);
+    s += `<line x1="${f(tx)}" y1="${f(ty)}" x2="${f(tx2)}" y2="${f(ty2)}" stroke="#e6e2ff" stroke-width="1.6"/><line x1="${f(tx2)}" y1="${f(ty2)}" x2="${f(lx)}" y2="${f(ly)}" stroke="rgba(230,226,255,.3)"/>`;
+    s += `<text x="${f(gx)}" y="${f(gy)}" class="bc-wp" text-anchor="middle" dominant-baseline="central">${g15(b.g)}</text><text x="${f(dx)}" y="${f(dy)}" class="bc-wd" text-anchor="middle" dominant-baseline="central">${Math.floor(b.lon % 30)}°${b.retro ? ' R' : ''}</text>`;
+    const [cx0, cy0] = P(b.lon, 150); s += `<circle cx="${f(cx0)}" cy="${f(cy0)}" r="2.2" fill="#e6e2ff"/>`;
+  });
+  return s + `</svg>`;
+}
+function fullChartHTML(c) {
+  let F; try { F = ASTRO.full(c.date, c.unknown ? '' : (c.time || ''), c.place || null); } catch (e) { return ''; }
+  const sgn = l => { const S = ASTRO.SIGNS[Math.floor(l / 30)]; return `${g15(S.s)} ${ASTRO.deg(l)} ${S.n}`; };
+  const rows = F.bodies.map(b => { const S = ASTRO.SIGNS[b.sign]; return `<div class="bc-row"><span class="bc-pg">${g15(b.g)}</span><div class="grow"><div class="bc-rt"><b>${b.n}</b><span class="mono">${sgn(b.lon)}${b.retro ? ' · Retrograde' : ''}${b.house ? ' · ' + ordn(b.house) + ' house' : ''}${b.k === 'moon' && F.moonApprox ? ' · approximate' : ''}</span></div><p>${b.n} in ${S.n}: ${b.mean}, expressed in a ${ASTRO.STYLE[b.sign]} way.${b.house ? ' In the ' + ordn(b.house) + ' house of ' + ASTRO.HOUSES[b.house - 1] + '.' : ''}</p></div></div>`; }).join('');
+  const angles = F.houses ? `<div class="bc-row"><span class="bc-pg bc-ang">AC</span><div class="grow"><div class="bc-rt"><b>Ascendant</b><span class="mono">${sgn(F.houses.asc)}</span></div><p>Your Rising sign, on the eastern horizon at the moment you were born.</p></div></div><div class="bc-row"><span class="bc-pg bc-ang">MC</span><div class="grow"><div class="bc-rt"><b>Midheaven</b><span class="mono">${sgn(F.houses.mc)}</span></div><p>The highest point of your chart, linked with career, reputation and direction.</p></div></div>` : '';
+  const asp = F.aspects.slice(0, 12).map(x => `<div class="bc-asp"><span>${g15(x.a.g)} ${x.a.n}</span><span class="bc-ak ${x.kind}">${g15(x.gl)} ${x.nm}</span><span>${g15(x.b.g)} ${x.b.n}</span><span class="mono muted">${x.orb.toFixed(1)}°</span></div>`).join('');
+  return `<div class="bc-fullhead"><div><div class="kicker">The full picture</div><h2 class="h2" style="margin-top:12px">Your full <em>chart</em></h2></div>${F.houses ? `<span class="muted" style="font-size:13px">${F.houses.sys} houses · tropical zodiac</span>` : ''}</div>
+    ${F.exact ? '' : `<div class="callout" style="margin-bottom:16px">${I.info}<div>Without your birth time and birthplace, houses, the Ascendant and the Midheaven can't be placed, and the Moon is shown at noon, so it may be off by several degrees. The other planets move slowly enough to be reliable from the date alone.</div></div>`}
+    <div class="bc-full"><div class="card bc-wcard">${chartWheel(F)}<div class="bc-legend"><span><i style="background:#7fb8ff"></i>Harmonious aspect</span><span><i style="background:#f0a0be"></i>Challenging aspect</span>${F.houses ? '<span><i style="background:#d9bd7f"></i>Angles</span>' : ''}</div></div>
+      <div class="card bc-list"><div class="lbl">Planets${F.houses ? ' and angles' : ''}</div>${angles}${rows}</div></div>
+    ${asp ? `<div class="card" style="margin-top:14px"><div class="lbl">Aspects</div><p class="muted" style="font-size:13px;margin-top:6px">The angles planets make to each other, tightest first. Astrology reads trines and sextiles as flowing, squares and oppositions as tension that drives growth, and conjunctions as energies blending.</p><div class="bc-asps">${asp}</div></div>` : ''}`;
+}
+
 function chartMini() {
   const c = Store.s.chart, r = chartResult(c);
   if (!r) return `<div class="uv-big3 uv-big3-cta"><div><div class="lbl">Your Big Three</div><p class="muted" style="font-size:13px;margin-top:6px">Sun, Moon and Rising, calculated from your birth date. Always free.</p></div><a class="btn sm" href="#chart">Discover your birth chart ${I.arrow}</a></div>`;
@@ -831,7 +883,7 @@ function vChart() {
       <p class="dnote">Only your birth date is required. Your details stay private to you.</p>
     </section>
     <section class="sec" id="bcRes" style="margin-top:22px"></section>
-    <section class="sec card tight"><p class="muted" style="font-size:13px">Sign positions are calculated in your browser with standard astronomical formulas, accurate to well under one degree, using the tropical zodiac followed in Western astrology. The meanings come from astrological tradition. They are interpretation for reflection, not science or prediction. Birthplace data from <a href="https://www.geonames.org" style="border-bottom:1px solid var(--line2)">GeoNames</a>, CC BY 4.0.</p></section>
+    <section class="sec card tight"><p class="muted" style="font-size:13px">Sign positions are calculated in your browser with standard astronomical formulas, accurate to within about a tenth of a degree, using the tropical zodiac followed in Western astrology. Houses use the Placidus system. The meanings come from astrological tradition. They are interpretation for reflection, not science or prediction. Birthplace data from <a href="https://www.geonames.org" style="border-bottom:1px solid var(--line2)">GeoNames</a>, CC BY 4.0.</p></section>
   </div>`;
   const place = $('#bcPlace'), sg = $('#bcSugg'); let list = [], act = 0;
   const pick = row => { D.place = { n: row[0], lat: row[1], lon: row[2], tz: row[3] }; place.value = row[0]; sg.classList.remove('open'); };
@@ -859,7 +911,8 @@ function vChart() {
   const show = c => {
     const r = chartResult(c); if (!r) return;
     $('#bcRes').innerHTML = `<div class="bc-grid">${bigCard('sun', r.sun, c)}${bigCard('moon', r.moon, c)}${bigCard('rising', r.rising, c)}</div>
-      <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>`;
+      <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>
+      <div class="sec" style="margin-top:56px">${fullChartHTML(c)}</div>`;
     $('#bcSave').onclick = () => { Store.s.chart = c; if (!Store.s.profile.birth) Store.s.profile.birth = c.date; Store.save(); toast('Your Big Three is saved to My Universe'); };
   };
   $('#bcGo').onclick = () => { const c = read(); if (!birthParts(c.date)) return toast('Enter your birth date'); if (place.value.trim() && !c.place) return toast('Choose your birthplace from the list'); show(c); $('#bcRes').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
