@@ -334,6 +334,7 @@ function suggestions(q) {
   else {
     INTENT.forEach(it => { if (it.n.toLowerCase().includes(q) || INT_KEYS[it.id].some(k => k.includes(q) || q.includes(k))) out.push({ t: 'Intention', v: it.n, d: it.l, h: 'intention', i: it.id }); });
     if ('life path'.includes(q) || q.includes('numerology') || q.includes('destiny') || q.includes('soul') || q.includes('birth')) out.push({ t: 'Tool', v: 'Numerology', d: 'Life path, destiny, soul urge and more', h: 'numerology' });
+    if (['astro', 'zodiac', 'birth chart', 'horoscope', 'sun sign', 'moon sign', 'rising', 'big three', 'star sign'].some(k => q.includes(k) || (q.length >= 3 && k.startsWith(q))) || (q.length >= 3 && ASTRO.SIGNS.some(s => s.n.toLowerCase().startsWith(q)))) out.push({ t: 'Tool', v: 'Your Birth Chart', d: 'Your Sun, Moon and Rising signs, free', h: 'chart' });
     if (q.includes('mix') || q.includes('studio') || q.includes('binaural') || q.includes('rain') || q.includes('ocean')) out.push({ t: 'Tool', v: 'Studio', d: 'Layer tones, binaural beats and ambience', h: 'studio' });
     Object.entries(ANGEL).filter(([k, v]) => v[0].toLowerCase().includes(q)).slice(0, 5).forEach(([k, v]) => out.push({ t: 'Angel number', v: k, d: v[0], h: 'n-' + k }));
     Object.entries(FREQ).filter(([k, v]) => v.n.toLowerCase().includes(q) || v.tr.toLowerCase().includes(q)).slice(0, 4).forEach(([k, v]) => out.push({ t: 'Frequency', v: fmtHz(+k), d: v.n, h: fKey(+k) }));
@@ -781,6 +782,90 @@ function vIntention() {
   if (sel !== INTENT[0].id) setTimeout(() => $('#itDetail').scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
 }
 
+
+/* ---------- birth chart ---------- */
+const BIG = { sun: ['Sun', 'Core identity'], moon: ['Moon', 'Emotional world'], rising: ['Rising', 'How you first come across'] };
+const zs = i => ASTRO.SIGNS[i].s + '︎';
+function loadCities(cb) { if (window.NU_CITIES) return cb(); const s = document.createElement('script'); s.src = 'cities.js'; s.onload = cb; s.onerror = () => toast('The city list could not load. Enter coordinates instead.'); document.head.appendChild(s); }
+function chartResult(c) { try { return c && c.date ? ASTRO.compute(c.date, c.unknown ? '' : (c.time || ''), c.place || null) : null; } catch (e) { return null; } }
+function bigCard(kind, r, c) {
+  const [nm, sub] = BIG[kind];
+  const head = `<div class="bc-head"><span class="lbl">${nm}</span><span class="bc-sub">${sub}</span></div>`;
+  if (!r) {
+    const why = !c.time || c.unknown ? 'Add your birth time and birthplace to reveal your Rising sign. It changes about every two hours, so the time matters.' : 'Add your birthplace to reveal your Rising sign.';
+    return `<div class="bc-card bc-blank">${head}<div class="bc-sym">?</div><div class="bc-name">Not yet known</div><p>${why}</p></div>`;
+  }
+  if (r.i.length === 2) {
+    const [x, y] = r.i.map(i => ASTRO.SIGNS[i]);
+    return `<div class="bc-card">${head}<div class="bc-sym bc-two">${zs(r.i[0])}<span>or</span>${zs(r.i[1])}</div><div class="bc-name">${x.n} or ${y.n}</div><p>${kind === 'sun' ? 'You were born on the day the Sun moved between signs.' : 'The Moon moved between signs on your birth date.'} ${c.time && !c.unknown ? 'Adding your birthplace decides which.' : 'Your birth time decides which.'}</p></div>`;
+  }
+  const S = ASTRO.SIGNS[r.i[0]];
+  return `<div class="bc-card">${head}<div class="bc-sym">${zs(r.i[0])}</div><div class="bc-name">${S.n}${r.lon !== undefined && c.place && c.time && !c.unknown ? `<span class="bc-deg mono">${ASTRO.deg(r.lon)}</span>` : ''}</div><p>${S[kind === 'rising' ? 'rise' : kind]}</p><div class="chips" style="margin-top:14px"><span class="chip" style="cursor:default">${S.el}</span><span class="chip" style="cursor:default">${S.mo}</span><span class="chip" style="cursor:default">Ruled by ${S.ru}</span></div></div>`;
+}
+function chartMini() {
+  const c = Store.s.chart, r = chartResult(c);
+  if (!r) return `<div class="uv-big3 uv-big3-cta"><div><div class="lbl">Your Big Three</div><p class="muted" style="font-size:13px;margin-top:6px">Sun, Moon and Rising, calculated from your birth date. Always free.</p></div><a class="btn sm" href="#chart">Discover your birth chart ${I.arrow}</a></div>`;
+  const cell = (k, x) => `<a class="uv-b3" href="#chart"><span class="uv-b3s">${x ? (x.i.length === 2 ? zs(x.i[0]) : zs(x.i[0])) : '?'}</span><span><span class="lbl">${BIG[k][0]}</span><b>${x ? x.i.map(i => ASTRO.SIGNS[i].n).join(' or ') : 'Add birth time'}</b></span></a>`;
+  return `<div class="uv-big3"><div class="uv-b3row">${cell('sun', r.sun)}${cell('moon', r.moon)}${cell('rising', r.rising)}</div><a class="uv-link" href="#chart">View your birth chart ${I.arrow}</a></div>`;
+}
+function vChart() {
+  const saved = Store.s.chart || {};
+  const D = { date: saved.date || Store.s.profile.birth || '', time: saved.time || '', unknown: !!saved.unknown, place: saved.place || null };
+  app.innerHTML = `<div class="page fade">
+    <button class="back" data-back="universe">${I.back} Back</button>
+    <div class="kicker">Astrology · Always free</div><h1 class="h2" style="margin-top:14px">Your Birth <em>Chart</em></h1>
+    <p class="lead" style="margin-top:14px">Your Big Three: the Sun, Moon and Rising signs, worked out from where they were in the sky when you were born.</p>
+    <div class="meta" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">${lensTag('ac', 'Astronomy')}${lensTag('trad', 'Astrology tradition')}</div>
+    <section class="sec card" style="margin-top:30px">
+      <div class="bc-form">
+        <div class="field"><label for="bcDate">Birth date</label><input class="input" type="date" id="bcDate" value="${esc(D.date)}"></div>
+        <div class="field"><label for="bcTime">Birth time <span class="uv-opt">For Rising</span></label><input class="input" type="time" id="bcTime" value="${esc(D.time)}"${D.unknown ? ' disabled' : ''}><label class="bc-check"><input type="checkbox" id="bcUnknown"${D.unknown ? ' checked' : ''}> I don't know my birth time</label></div>
+        <div class="field bc-place"><label for="bcPlace">Birthplace <span class="uv-opt">For Rising</span></label><input class="input" id="bcPlace" placeholder="Start typing a city" autocomplete="off" value="${esc(D.place ? D.place.n : '')}"><div class="sugg" id="bcSugg" role="listbox"></div><button class="bc-coord" id="bcCoordT">Not listed? Enter coordinates</button></div>
+      </div>
+      <div class="bc-form bc-coords" id="bcCoords" style="display:none">
+        <div class="field"><label for="bcLat">Latitude</label><input class="input" type="number" step="0.01" id="bcLat" placeholder="40.71"></div>
+        <div class="field"><label for="bcLon">Longitude</label><input class="input" type="number" step="0.01" id="bcLon" placeholder="-74.01"></div>
+        <div class="field"><label for="bcTz">Time zone</label><select class="input" id="bcTz">${(Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC']).map(z => `<option${z === (Intl.DateTimeFormat().resolvedOptions().timeZone) ? ' selected' : ''}>${z}</option>`).join('')}</select></div>
+      </div>
+      <div class="actions" style="margin-top:20px"><button class="btn pri" id="bcGo">Reveal my Big Three</button></div>
+      <p class="dnote">Only your birth date is required. Your details stay private to you.</p>
+    </section>
+    <section class="sec" id="bcRes" style="margin-top:22px"></section>
+    <section class="sec card tight"><p class="muted" style="font-size:13px">Sign positions are calculated in your browser with standard astronomical formulas, accurate to well under one degree, using the tropical zodiac followed in Western astrology. The meanings come from astrological tradition. They are interpretation for reflection, not science or prediction.</p></section>
+  </div>`;
+  const place = $('#bcPlace'), sg = $('#bcSugg'); let list = [], act = 0;
+  const pick = row => { D.place = { n: row[0], lat: row[1], lon: row[2], tz: row[3] }; place.value = row[0]; sg.classList.remove('open'); };
+  const renderS = () => {
+    const q = place.value.trim().toLowerCase(); D.place = null; if (q.length < 2) { sg.classList.remove('open'); return; }
+    loadCities(() => {
+      const C = window.NU_CITIES, a = [], b = [];
+      for (const r of C) { const l = r[0].toLowerCase(); if (l.startsWith(q)) a.push(r); else if (l.includes(q)) b.push(r); if (a.length >= 8) break; }
+      list = a.concat(b).slice(0, 8); act = 0;
+      sg.innerHTML = list.length ? list.map((r, i) => `<div class="sg${i ? '' : ' act'}" data-i="${i}" role="option"><span class="d" style="color:var(--text)">${esc(r[0])}</span></div>`).join('') : '<div class="sg"><span class="d">No match. Try a nearby larger city, or enter coordinates.</span></div>';
+      sg.classList.add('open'); $$('.sg[data-i]', sg).forEach(el => el.onmousedown = e => { e.preventDefault(); pick(list[+el.dataset.i]); });
+    });
+  };
+  place.addEventListener('input', renderS);
+  place.addEventListener('blur', () => setTimeout(() => sg.classList.remove('open'), 150));
+  place.addEventListener('keydown', e => { if (!sg.classList.contains('open') || !list.length) return; if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); act = (act + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length; $$('.sg', sg).forEach((el, i) => el.classList.toggle('act', i === act)); } if (e.key === 'Enter') { e.preventDefault(); pick(list[act]); } });
+  $('#bcCoordT').onclick = () => { const c = $('#bcCoords'); c.style.display = c.style.display === 'none' ? '' : 'none'; };
+  $('#bcUnknown').onchange = e => { $('#bcTime').disabled = e.target.checked; };
+  const read = () => {
+    const c = { date: $('#bcDate').value, time: $('#bcTime').value, unknown: $('#bcUnknown').checked, place: D.place };
+    const la = parseFloat($('#bcLat').value), lo = parseFloat($('#bcLon').value);
+    if (!c.place && $('#bcCoords').style.display !== 'none' && la >= -90 && la <= 90 && lo >= -180 && lo <= 180) c.place = { n: la.toFixed(2) + '°, ' + lo.toFixed(2) + '° (' + $('#bcTz').value + ')', lat: la, lon: lo, tz: $('#bcTz').value };
+    return c;
+  };
+  const show = c => {
+    const r = chartResult(c); if (!r) return;
+    $('#bcRes').innerHTML = `<div class="bc-grid">${bigCard('sun', r.sun, c)}${bigCard('moon', r.moon, c)}${bigCard('rising', r.rising, c)}</div>
+      <div class="actions" style="margin-top:18px"><button class="btn pri" id="bcSave">${I.star} Save to My Universe</button><a class="btn" href="#universe">Go to My Universe</a></div>`;
+    $('#bcSave').onclick = () => { Store.s.chart = c; if (!Store.s.profile.birth) Store.s.profile.birth = c.date; Store.save(); toast('Your Big Three is saved to My Universe'); };
+  };
+  $('#bcGo').onclick = () => { const c = read(); if (!birthParts(c.date)) return toast('Enter your birth date'); if (place.value.trim() && !c.place) return toast('Choose your birthplace from the list'); show(c); $('#bcRes').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  if (Store.s.chart && Store.s.chart.date) show(Store.s.chart);
+}
+
 function starPos(list) {
   const pts = [];
   list.forEach(n => {
@@ -810,9 +895,9 @@ function vUniverse() {
     ? `<div class="card uv-life"><div class="uv-pair">
         <div><div class="lbl">Life path</div><div class="glow" style="font-size:88px;margin-top:10px">${lp.n}</div><div class="h3" style="font-size:24px">${NUM[lp.n].t}</div><p class="muted" style="font-size:13px;margin-top:6px">${esc(NUM[lp.n].e)}</p></div>
         <div><div class="lbl">Personal year ${per.cy}</div><div class="glow" style="font-size:88px;margin-top:10px">${per.py}</div><div class="h3" style="font-size:24px">A year of ${NUM[per.py].k.toLowerCase()}</div><p class="muted" style="font-size:13px;margin-top:6px">Personal month ${per.pm}, ${NUM[per.pm].k.toLowerCase()}. Personal day ${per.pd}, ${NUM[per.pd].k.toLowerCase()}.</p></div>
-      </div><div class="actions" style="margin-top:18px"><a class="btn sm pri" href="#numerology">See your free full report ${I.arrow}</a><button class="btn sm" id="uChange">Change birth date</button></div></div>`
+      </div><div class="actions" style="margin-top:18px"><a class="btn sm pri" href="#numerology">See your free full report ${I.arrow}</a><button class="btn sm" id="uChange">Change birth date</button></div>${chartMini()}</div>`
     : `<div class="card uv-life"><h2 class="uv-title">Discover your Life Path</h2><p class="muted" style="font-size:14px;margin-top:6px">Enter your birth date to see your Life Path and Personal Year.</p>
-        <div class="uv-form"><input class="input" type="date" id="uBirth" value="${esc(prof.birth || '')}" aria-label="Birth date"><button class="btn pri" id="uCalc">Calculate my numbers</button></div></div>`;
+        <div class="uv-form"><input class="input" type="date" id="uBirth" value="${esc(prof.birth || '')}" aria-label="Birth date"><button class="btn pri" id="uCalc">Calculate my numbers</button></div><a class="uv-link" href="#chart" style="margin-top:16px;align-self:flex-start">Discover your birth chart ${I.arrow}</a></div>`;
   const favCard = (() => {
     if (!S.favN.length) return `<div class="card"><div class="lbl">Favorite numbers</div><div class="uv-empty"><span class="uv-ic">${icSpark}</span><b>No favorite numbers yet.</b><span>Save numbers that feel meaningful to you.</span><a class="btn sm" href="#explore">Explore numbers</a></div></div>`;
     const pts = starPos(S.favN.slice().reverse());
@@ -930,7 +1015,7 @@ function vPrivacy() {
   app.innerHTML = `<div class="page fade bp" style="max-width:860px">
     <div class="kicker">Privacy</div><h1 class="h2" style="margin-top:14px">Your universe <em>stays yours</em></h1>
     <p class="lead" style="margin-top:14px">Last updated ${new Date(2026, 10, 15).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-    <section class="sec card"><h3>What we store</h3><p>Only what you choose to enter: an optional birth date and name for numerology, favorite numbers and frequencies, saved mixes, journal entries, recently explored pages and listening history.</p></section>
+    <section class="sec card"><h3>What we store</h3><p>Only what you choose to enter: an optional birth date and name for numerology, an optional birth time and birthplace for your birth chart, favorite numbers and frequencies, saved mixes, journal entries, recently explored pages and listening history.</p></section>
     <section class="sec card"><h3>Where it lives</h3><p>All of it is saved in your own browser on your own device. It is not sent to our servers, it is not shared or sold, and there are no accounts. Clearing your browser data, or using Erase everything in My Universe, deletes it completely.</p></section>
     <section class="sec card"><h3>What we do not do</h3><ul><li>No advertising trackers and no selling of data.</li><li>No cookies are required to use the site.</li><li>Sound is generated on your device. Nothing you play is recorded.</li></ul></section>
     <section class="sec card"><h3>About the content</h3><p>Numerology and angel number meanings are spiritual and cultural traditions, not scientific findings or predictions. Frequency information describes physical sound, with an evidence rating for any claim. Nothing on this site is medical advice.</p></section>
@@ -942,13 +1027,13 @@ function vPrivacy() {
 function route() {
   const h = decodeURIComponent((location.hash || '#home').slice(1)) || 'home';
   Scopes.length = 0;
-  if (T.node && !h.startsWith('n-') && !h.startsWith('f-') && h !== 'home' && h !== 'universe') toneStop();
+  if (T.node && !h.startsWith('n-') && !h.startsWith('f-') && h !== 'home' && h !== 'universe' && h !== 'chart') toneStop();
   let key = h;
   if (h.startsWith('n-')) { key = 'number'; vNumber(h.slice(2)); }
   else if (h.startsWith('f-')) { key = 'freq'; vFreq(parseFKey(h.slice(2))); }
-  else ({ home: vHome, explore: vExplore, angel: vAngel, numerology: vNumerology, studio: vStudio, intention: vIntention, universe: vUniverse, blueprint: vBlueprint, privacy: vPrivacy }[h] || (key = 'home', vHome))();
+  else ({ home: vHome, explore: vExplore, angel: vAngel, numerology: vNumerology, studio: vStudio, intention: vIntention, universe: vUniverse, blueprint: vBlueprint, privacy: vPrivacy, chart: vChart }[h] || (key = 'home', vHome))();
   current = key;
-  if (key !== 'number' && key !== 'freq') document.title = 'The Number Universe' + (key === 'home' ? '' : ' · ' + ({ explore: 'Explore Numbers', angel: 'Angel Numbers', numerology: 'Numerology', studio: 'Frequency Studio', intention: 'Discover by Intention', universe: 'My Universe', blueprint: 'Blueprint', privacy: 'Privacy' }[key] || ''));
+  if (key !== 'number' && key !== 'freq') document.title = 'The Number Universe' + (key === 'home' ? '' : ' · ' + ({ explore: 'Explore Numbers', angel: 'Angel Numbers', numerology: 'Numerology', studio: 'Frequency Studio', intention: 'Discover by Intention', universe: 'My Universe', blueprint: 'Blueprint', privacy: 'Privacy', chart: 'Your Birth Chart' }[key] || ''));
   document.body.classList.toggle('inner', key !== 'home');
   $$('.navlinks a').forEach(a => a.classList.toggle('on', a.dataset.r === key));
   $('#navlinks').classList.remove('open');
